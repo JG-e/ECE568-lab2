@@ -222,7 +222,40 @@ class BioConnect:
 		# >>> Add code here to call
 		#    .../v2/users/<userId>/authenicators/<authenticatorId>
 		# and process the response
+		global hostname
+		url = f"https://{hostname}/v2/users/{self.userId}/authenticators/{self.authenticatorId}"
+		headers = {
+			'Content-Type':		'application/json',
+			'accept':		'application/json',
+			'bcaccesskey':		self.bcaccesskey,
+			'bcentitykey':		self.bcentitykey,
+			'bctoken':		self.bctoken
+		}
+  		# Send our GET request to the server
+		result = requests.get(url, headers=headers)
 
+		if result == False:
+			# Error: we did not receive an HTTP/200
+			print(headers)
+			print(result.content)
+			sys.exit("Error: unable to get Authenticator status")
+
+		try:
+			# Parse the JSON reply
+			reply = json.loads(result.content.decode('utf-8'))
+
+		except ValueError:
+			print(headers)
+			print(result.content)
+			sys.exit("Error: unexpected reply for QR code")
+
+		if reply.get("status","") == "active":
+			enrolled = 0
+			for x in ("face_status", "voice_status", "fingerprint_status", "eye_status"): 
+				if reply.get(x) == "enrolled":
+					enrolled += 1
+			if enrolled >= 1:
+				return('active')
 		return('')
 
 
