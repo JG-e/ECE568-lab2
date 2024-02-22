@@ -271,19 +271,24 @@ class BioConnect:
 
 		global	hostname
 		url = f"https://{hostname}/v2/user_verifications"
+  
 		headers = {
 			'Content-Type':		'application/json',
 			'accept':		'application/json',
 			'bcaccesskey':		self.bcaccesskey,
 			'bcentitykey':		self.bcentitykey,
 			'bctoken':		self.bctoken,
+		}
+  
+		body = {
 			'user_uuid': self.userId,
 			'transaction_id': transactionId,
-			'message': "Login request",
-		}
-		res = requests.put(url, headers=headers)
-		if not res: 
-			print(res.content)
+			'message': message
+   		}
+  
+		res = requests.post(url, headers=headers, data=json.dumps(body))
+		if res.status_code != 200: 
+			print(res.text)
 			sys.exit("Error: unable to send stepup request")
 		try:
 			# Parse the JSON reply
@@ -293,8 +298,8 @@ class BioConnect:
 			print(headers)
 			print(res.content)
 			sys.exit("Error: unexpected reply for stepup request")
-   
-		self.stepupId = json_res.get("uuid","")
+		id = json_res["user_verification"]['uuid']
+		self.stepupId = id
 
 	# ===== getStepupStatus: Fetches the status of the user auth request
 
@@ -324,7 +329,7 @@ class BioConnect:
 			print(res.content)
 			sys.exit("Error: unexpected reply for stepup status")
 
-		return(json_res.get("status",""))
+		return(json_res["user_verification"]["status"])
 
 
 	# ===== deleteUser: Deletes the user and mobile phone entries
