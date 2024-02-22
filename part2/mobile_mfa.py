@@ -13,7 +13,7 @@ import json
 import requests
 import qrcode_terminal
 
-exec(compile(source=open('../setup/server_config.py').read(),
+exec(compile(source=open('setup/server_config.py').read(),
 	filename='server_config.py', mode='exec'))
 
 
@@ -269,7 +269,32 @@ class BioConnect:
 		#     .../v2/user_verifications
 		# to push an authentication request to the mobile device
 
-		pass
+		global	hostname
+		url = f"https://{hostname}/v2/user_verifications"
+		headers = {
+			'Content-Type':		'application/json',
+			'accept':		'application/json',
+			'bcaccesskey':		self.bcaccesskey,
+			'bcentitykey':		self.bcentitykey,
+			'bctoken':		self.bctoken,
+			'user_uuid': self.userId,
+			'transaction_id': transactionId,
+			'message': "Login request",
+		}
+		res = requests.put(url, headers=headers)
+		if not res: 
+			print(res.content)
+			sys.exit("Error: unable to send stepup request")
+		try:
+			# Parse the JSON reply
+			json_res = json.loads(res.content.decode('utf-8'))
+   
+		except ValueError:
+			print(headers)
+			print(res.content)
+			sys.exit("Error: unexpected reply for stepup request")
+   
+		self.stepupId = json_res.get("uuid","")
 
 	# ===== getStepupStatus: Fetches the status of the user auth request
 
@@ -278,8 +303,28 @@ class BioConnect:
 		# >>> Add code here to call
 		#     .../v2/user_verifications/<verificationId>
 		# to poll for the current status of the verification
+		global hostname
+		url = f"https://{hostname}/v2/user_verifications/{self.stepupId}"
+		headers = {
+			'Content-Type':		'application/json',
+			'accept':		'application/json',
+			'bcaccesskey':		self.bcaccesskey,
+			'bcentitykey':		self.bcentitykey,
+			'bctoken':		self.bctoken,
+		}
+		res = requests.get(url, headers=headers)
+		if not res: 
+			print(res.content)
+			sys.exit("Error: unable to get stepup status")
+		try:
+			# Parse the JSON reply
+			json_res = json.loads(res.content.decode('utf-8'))
+		except ValueError:
+			print(headers)
+			print(res.content)
+			sys.exit("Error: unexpected reply for stepup status")
 
-		return('declined')
+		return(json_res.get("status",""))
 
 
 	# ===== deleteUser: Deletes the user and mobile phone entries
