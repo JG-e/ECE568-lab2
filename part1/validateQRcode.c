@@ -97,11 +97,11 @@ validateTOTP(char * secret_hex, char * TOTP_string)
 	// Get the current time
 	time(&currentTime);
 	// assume the above is in seconds
-	unsigned int currStep = currentTime / 30;
+	unsigned int currStep = floor(currentTime / 30);
 	// printf("Sizeof unsigned int: %d\n", sizeof(unsigned int));  // = 4
 	// Print the current Unix time - debug
 	// printf("Current Unix Time: %ld\n", currentTime); 
-	printf("Current timestep: %d\n", currentTime / 30); // debug
+	printf("Current timestep: %d\n", floor(currentTime / 30)); // debug
 	unsigned char stepsAsBytes[4];
 	convertIntegerToCharArray(currStep, stepsAsBytes);
 	for (int i = 0 ; i < 4 ; i++) {
