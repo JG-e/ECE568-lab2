@@ -87,26 +87,57 @@ int extractLast31Bits(int num) {
     return extractedBits;
 }
 
-int StToNum(char *s) {
-    int result = 0;
-    int len = strlen(s);
-    int power = 1; // Start with 2^0
 
-    // Iterate over the string from right to left
-    for (int i = len - 1; i >= 0; i--) {
-        // If the character is '1', add the corresponding power of 2 to the result
+char* IntToBinaryString(int num) {
+    // Number of bits in an integer
+    int num_bits = sizeof(int) * 8;
+    char *binary_string = (char *)malloc(num_bits + 1); // +1 for null terminator
+    if (binary_string == NULL) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+
+    // Start from the leftmost bit (most significant bit)
+    for (int i = num_bits - 1; i >= 0; i--) {
+        // Extract the i-th bit using bitwise AND
+        int bit = (num >> i) & 1;
+        // Convert the bit to a character and store it in the string
+        binary_string[num_bits - 1 - i] = bit + '0';
+    }
+    // Null-terminate the string
+    binary_string[num_bits] = '\0';
+
+    return binary_string;
+}
+
+
+int StToNum(unsigned char* s) {
+    int result = 0;
+
+    // Start from the leftmost character
+    for (int i = 0; i < strlen(s); i++) {
+        // Shift the result to the left to make space for the new bit
+        result = result << 1;
+
+        // If the current character is '1', set the rightmost bit to 1
         if (s[i] == '1') {
-            result += power;
+            result = result | 1;
+        } else if (s[i] != '0') {
+            // If the character is not '0' or '1', it's an invalid binary string
+            printf("Invalid binary string!\n");
+            return -1;
         }
-        // Update the power of 2 for the next bit
-        power *= 2;
     }
     return result;
 }
 
 
-int DT(char* string) {
-	int offset = StToNum((char*) (string[19] & 0xf));
+int DT(unsigned char* string) {
+	// 31-bit string
+	unsigned char* s;
+	int res = (string[19] & 0x0f);
+	s = IntToBinaryString(res);
+	int offset = StToNum(s);
 	int P = string[offset] | (string[offset+1] << 8) | (string[offset+2] << 16) | (string[offset+3] << 24);
 	// binCode below is 31 digits in binary
 	int binCode = extractLast31Bits(P);
