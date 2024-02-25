@@ -35,7 +35,7 @@ uint8_t hex_to_bin_digit(char hex_digit) {
 char* hex_to_binary(const char* hex_string) {
     // Allocate memory for binary string (4 bits for each hex digit)
 	// 8 bits = 1 byte, thus 2 hex digits = 1 byte, also +1 for null terminator
-    char* binary_string = (char*)malloc(SHA1_BLOCKSIZE); 
+  char* binary_string = (char*)malloc(SHA1_BLOCKSIZE); 
 	memset(binary_string, 0, SHA1_BLOCKSIZE);
     
 	int bin_index = 0;
@@ -45,7 +45,7 @@ char* hex_to_binary(const char* hex_string) {
 		binary_string[bin_index++] = (upper << 4) | lower & 0xFF;
 	}
 
-    return binary_string;
+  return binary_string;
 }
 
 int extractLast31Bits(int num) {
@@ -184,10 +184,7 @@ validateTOTP(char * secret_hex, char * TOTP_string)
 	// Step 6.1  Generate a 4-byte string Sbits = DT(HS) , return 31-bit string.
 	HMAC(key, hmac);
 	int totp = truncateHMAC(hmac);
-	
-	printf("Derived totp: %d\n", totp);
 	int givenTotp = atoi(TOTP_string);
-	printf("Given totp: %d\n", givenTotp);
 
 	// Step 7: return whether the given string is equal to the truncated hmac as integer values
 	return totp == givenTotp;
