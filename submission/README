@@ -1,11 +1,34 @@
 #ZeZheng Gu, 1005190874, zezheng.gu@mail.utoronto.ca
 #Dylan Hollohan, 1004407439, dylan.hollohan@mail.utoronto.ca
 
-Part 1:
-  1.1: We had to build up a long string otpauth://totp/ACCOUNTNAME?issuer=ISSUER&secret=SECRET&period=30, replacing ACCOUNTNAME, ISSUER and SECRET as url encoded versions.  We were given a string of 20 characters, but in order to perform the base32_encode function, we needed to first convert the string to an array of unsigned chars storing the binary of the string characters represented in secret_hex.  This involved plucking off two hex digits at a time from the string and converting that hex character to its binary value.  We stored this as an array of unsigned chars called bin_secret.  After base32 encoding these binary values, we could append the encoded secret into the string and finally call displayQRcode on the completed URI.  From there we used Google Authenticator app to capture the QR code and start generating TOTPs for us. 
+#Part 1:
+  ##1.1: We had to build up a long string otpauth://totp/ACCOUNTNAME?issuer=ISSUER&secret=SECRET&period=30, replacing ACCOUNTNAME, ISSUER and SECRET as url encoded versions.  We were given a string of 20 characters, but in order to perform the base32_encode function, we needed to first convert the string to an array of unsigned chars storing the binary of the string characters represented in secret_hex.  This involved plucking off two hex digits at a time from the string and converting that hex character to its binary value.  We stored this as an array of unsigned chars called bin_secret.  After base32 encoding these binary values, we could append the encoded secret into the string and finally call displayQRcode on the completed URI.  From there we used Google Authenticator app to capture the QR code and start generating TOTPs for us. 
 
-  1.2: We again receive the secretHex and a given TOTP to validate as strings.  
-first we converted the string of hex digits to binary. To generate the hmac, we had to prepare some 64 byte blocks of the 0x36 and 0x5c repeated pads. Next we xor'd key with inner pad as the inner key.  Next use time.h to get current time and integer divide by 30 to get the number of timesteps since unix epoch.  We store this time as an array of unsigned char in little endian. We hash the inner key + time array to get inner hash. Next we hash the outer key concatenated with the inner hash, and get a 160 bit hash as an HMAC. To generate a TOTP of 6 digits, we follow the procedure in rfc to truncate HMAC to 6 digits.  Finally we compare given string TOTP's value with the value of truncated HMAC and return whether they are the same.
+  ##1.2: We again receive the secretHex and a given TOTP to validate as strings.  
+first we converted the string of hex digits to binary. To generate the hmac, we had to prepare some SHA1_BLOCKSIZE byte blocks of the 0x36 and 0x5c repeated pads. Next we xor'd key with inner pad as the inner key.  Next use time.h to get current time and integer divide by 30 to get the number of timesteps since unix epoch.  We store this time as an array of unsigned char in little endian so that it could be read in bits. We hash the inner key + time array to get inner hash. Next we hash the outer key concatenated with the inner hash, and get a 160 bit hash as an HMAC. To generate a TOTP of 6 digits, we follow the procedure in rfc to truncate HMAC to 6 digits.  Finally we compare given string TOTP's value with the value of truncated HMAC and return whether they are the same.
 
-Part 2:
-  [ TO-DO: ]
+#Part 2:
+  ##2.1: This part does not have too much coding involved. Setting up environment and enrolling the device.
+
+  ##2.2: In this part, we are doing a simulation of logging in by sending some RESTful APIs to the BioConnect server. 
+  First we send a get request by formatting the userID and the AuthenticatorID into the URI, 
+  and checked the activeness and the biometric enrollments of the account by reading the JSON body of the response of the server. 
+  
+  Second, we will send a login POST request to using the "https://{hostname}/v2/user_verifications" API, including the body of the request with the 
+  three params required: 
+  user_uuid = <userId>
+  transaction_id = <randomString>
+  message = “Login request”.  
+  And we should at this point get a confirmation of the server in which there is a 
+  JSON that looks like the following: 
+  {"user_verification":{"uuid":"1TNCPQYNN5J3AA7J0BR0SCASBW","status":"pending", [...]}}
+  We extract the uuid and stored it into the BioConnect object.
+  
+  Thirdly, we confirm and auth the login request on our device and check the status of the login
+  by calling the GET request on the API with the uuid stored in the BioConnect object: 
+  https://.../v2/user_verifications/<verificationId>, which 
+  returns a body of JSON that is the same to the second step, but we only care about the status of the 
+  request here. We will wait for a while until the status is "success". Otherwise, it is a fail to login. 
+
+  A thing to note here is that the BioConnect server seems buggy and I personally was never successful on logging in even though I approved the biometrics many times.
+
