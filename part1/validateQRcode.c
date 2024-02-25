@@ -79,7 +79,7 @@ void calculateKey(unsigned char *key_64, unsigned char *resultKey, int num) {
 
 int extractLast31Bits(int num) {
     // Define a bitmask with the last 31 bits set to 1
-    unsigned int bitmask = (1 << 31) - 1;
+    int bitmask = 0x7FFFFFFF;
 
     // Perform bitwise AND to extract the last 31 bits
     int extractedBits = num & bitmask;
@@ -134,23 +134,27 @@ int StToNum(unsigned char* s) {
 
 int DT(unsigned char* string) {
 	// 31-bit string
-	unsigned char* s;
-	int res = (string[19] & 0x0f);
-	s = IntToBinaryString(res);
-	int offset = StToNum(s);
+	unsigned char res = (string[19] & 0x0f);
+	int offset = res;
 	int P = string[offset] | (string[offset+1] << 8) | (string[offset+2] << 16) | (string[offset+3] << 24);
 	// binCode below is 31 digits in binary
 	int binCode = extractLast31Bits(P);
 	return binCode;
 }
 
+int truncateHMAC(unsigned char* hmac) {
+	// truncate the hmac according to rfc4226
 
-static int
-validateTOTP(char * secret_hex, char * TOTP_string)
-{
-	// Step 1: Combine the key and innerpad to get the innerKey
-	unsigned char* key = secret_hex;
-	int key_len = strlen(secret_hex);
+	// Step 6.2  Generate a 4-byte string Snum = StToNum(Sbits) (Dynamic Truncation)
+	int Snum = DT(hmac);
+	// Step 6.3  Generate a 6-digit number Snum = Snum % 10^6
+	int totp = Snum % 1000000;
+	return totp;
+}
+
+void HMAC(unsigned char* key, unsigned char* result) {
+
+	int key_len = strlen(key);
 	unsigned char k_ipad[65]; 	/* inner padding -
 								* key XORd with ipad
 								*/	
@@ -176,53 +180,49 @@ validateTOTP(char * secret_hex, char * TOTP_string)
 	// Get the current time
 	time(&currentTime);
 	// assume the above is in seconds
-	unsigned int currStep = floor(currentTime / 30);
-	// printf("Sizeof unsigned int: %d\n", sizeof(unsigned int));  // = 4
-	// Print the current Unix time - debug
-	// printf("Current Unix Time: %ld\n", currentTime); 
-	printf("Current timestep: %d\n", floor(currentTime / 30)); // debug
-	unsigned char* stepsAsBytes = (unsigned char*) &currStep;
-	for (int i = 0 ; i < 4 ; i++) {
-		printf("stepAsBytes[%d]: %hhu\n", i, stepsAsBytes[i]); // debug
-	}
+	int currStep = floor(currentTime / 30);
+	
+	uint8_t* stepsAsBytes = (uint8_t*) &currStep;
 
 	// Now inner key and message have been calculated.  get the Inner hash:
 	// Step 3: get the inner hash.
   // calculate the innerHash = Sha1(inner key | message)
 
 	SHA1_INFO ctx1;
-	uint8_t innerHash[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
+	// uint8_t innerHash[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
+
+	// Perform the hashing according to rfc2104
 	sha1_init(&ctx1);
 	sha1_update(&ctx1, k_ipad, 64);
-	sha1_update(&ctx1, stepsAsBytes, 4); // message, as 4 bytes
-	// // keep calling sha1_update if you have more data to hash...
-	sha1_final(&ctx1, innerHash);
-	// after final, sha array will be populated with the unsigned chars.  Pass this to outer hash.
-	
-	uint8_t hmac[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
+	sha1_update(&ctx1, stepsAsBytes, sizeof(int)); // message, as 4 bytes
+
+	// keep calling sha1_update if you have more data to hash...
+	sha1_final(&ctx1, result);
+	// after final, sha array will be populated with the unsigned chars.  
+	// Pass this to outer hash.
 
 	// Step 4: calculate the outer key
-	// Step 5:  calculate the HMAC = Sha1(outer key | inner hash)
+	// Step 5:  calculate the result = Sha1(outer key | inner hash)
 
 	sha1_init(&ctx1);
 	sha1_update(&ctx1, k_opad, 64);
-	sha1_update(&ctx1, innerHash, 20);
-	sha1_final(&ctx1, hmac);
+	sha1_update(&ctx1, result, SHA1_DIGEST_LENGTH);
+	sha1_final(&ctx1, result);
+}
 
-	for (int i = 0 ; i < 20 ; i++) {
-		printf("hmac[%d]: %x\n", i, hmac[i]);
-		printf("hmac[%d]: %d\n", i, hmac[i]);
-	}
 
+static int
+validateTOTP(char * secret_hex, char * TOTP_string)
+{
+	// Step 1: Combine the key and innerpad to get the innerKey
+	unsigned char* key = secret_hex;
+	
+	uint8_t hmac[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
 	// Step 6: truncate the hmac to 6 digits.
 	// Step 6.1  Generate a 4-byte string Sbits = DT(HS) , return 31-bit string.
-	printf("hmac[19]: %x\n", hmac[19]);
-	printf("hmac[19] & 0xf: %x\n", hmac[19] & 0xf);
-
-	int binCode = DT(hmac);
-
-	// Step 6.2, modulo the binCode to be 6 digits:
-	int totp = binCode % 1000000; // 10^6
+	HMAC(key, hmac);
+	int totp = truncateHMAC(hmac);
+	
 	printf("Derived totp: %d\n", totp);
 	int givenTotp = atoi(TOTP_string);
 	printf("Given totp: %d\n", givenTotp);
