@@ -5,7 +5,7 @@
   ##1.1: We had to build up a long string otpauth://totp/ACCOUNTNAME?issuer=ISSUER&secret=SECRET&period=30, replacing ACCOUNTNAME, ISSUER and SECRET as url encoded versions.  We were given a string of 20 characters, but in order to perform the base32_encode function, we needed to first convert the string to an array of unsigned chars storing the binary of the string characters represented in secret_hex.  This involved plucking off two hex digits at a time from the string and converting that hex character to its binary value.  We stored this as an array of unsigned chars called bin_secret.  After base32 encoding these binary values, we could append the encoded secret into the string and finally call displayQRcode on the completed URI.  From there we used Google Authenticator app to capture the QR code and start generating TOTPs for us. 
 
   ##1.2: We again receive the secretHex and a given TOTP to validate as strings.  
-first we converted the string of hex digits to binary. To generate the hmac, we had to prepare some 64 byte blocks of the 0x36 and 0x5c repeated pads. Next we xor'd key with inner pad as the inner key.  Next use time.h to get current time and integer divide by 30 to get the number of timesteps since unix epoch.  We store this time as an array of unsigned char in little endian. We hash the inner key + time array to get inner hash. Next we hash the outer key concatenated with the inner hash, and get a 160 bit hash as an HMAC. To generate a TOTP of 6 digits, we follow the procedure in rfc to truncate HMAC to 6 digits.  Finally we compare given string TOTP's value with the value of truncated HMAC and return whether they are the same.
+first we converted the string of hex digits to binary. To generate the hmac, we had to prepare some SHA1_BLOCKSIZE byte blocks of the 0x36 and 0x5c repeated pads. Next we xor'd key with inner pad as the inner key.  Next use time.h to get current time and integer divide by 30 to get the number of timesteps since unix epoch.  We store this time as an array of unsigned char in little endian so that it could be read in bits. We hash the inner key + time array to get inner hash. Next we hash the outer key concatenated with the inner hash, and get a 160 bit hash as an HMAC. To generate a TOTP of 6 digits, we follow the procedure in rfc to truncate HMAC to 6 digits.  Finally we compare given string TOTP's value with the value of truncated HMAC and return whether they are the same.
 
 #Part 2:
   ##2.1: This part does not have too much coding involved. Setting up environment and enrolling the device.
@@ -29,6 +29,6 @@ first we converted the string of hex digits to binary. To generate the hmac, we 
   https://.../v2/user_verifications/<verificationId>, which 
   returns a body of JSON that is the same to the second step, but we only care about the status of the 
   request here. We will wait for a while until the status is "success". Otherwise, it is a fail to login. 
-  
+
   A thing to note here is that the BioConnect server seems buggy and I personally was never successful on logging in even though I approved the biometrics many times.
 
