@@ -5,30 +5,44 @@
 
 #include "lib/encoding.h"
 
-/**
-Converts the input hex string to an array of bytes as unsigned chars.  Every two hex
-digits of the string will be interpretted as an int and then put into the unsigned char 
-array.
-*/
-void convertHexStringToCharArray(char *hex, unsigned char *asArray) {
 
-	// use strtol to convert the hex byte to a decimal
-	
-	char * endPtr;
-	char buf[3]; // holds current two digits of hex input as a small string
+// Function to convert a hexadecimal character to its binary equivalent
+uint8_t hex_to_bin_digit(char hex_digit) {
+    switch(hex_digit) {
+        case '0': return 0b0000;
+        case '1': return 0b0001;
+        case '2': return 0b0010;
+        case '3': return 0b0011;
+        case '4': return 0b0100;
+        case '5': return 0b0101;
+        case '6': return 0b0110;
+        case '7': return 0b0111;
+        case '8': return 0b1000;
+        case '9': return 0b1001;
+        case 'A': return 0b1010;
+        case 'B': return 0b1011;
+        case 'C': return 0b1100;
+        case 'D': return 0b1101;
+        case 'E': return 0b1110;
+        case 'F': return 0b1111;
+        default:
+            printf("Invalid hexadecimal digit: %c\n", hex_digit);
+    }
+}
 
-	// Copy hex into two string parts
-	int i;
-	
-	for (i = 0 ; i < 10 ; i++) {
-		buf[0] = hex[2 * i];
-		buf[1] = hex[(2 * i) + 1];
-		buf[3] = '\0';
-
-		// convert hex string to long int
-		long int hexByte = strtol(buf, &endPtr, 16);
-		asArray[i] = (unsigned char) hexByte;
+// Function to convert a hexadecimal string to binary
+char* hex_to_binary(const char* hex_string) {
+    // Allocate memory for binary string (4 bits for each hex digit)
+    char* binary_string = (char*)malloc(10 ); 
+    
+	int bin_index = 0;
+	for (int i = 0; i < strlen(hex_string); i+=2) {
+		uint8_t upper = hex_to_bin_digit(hex_string[i]);
+		uint8_t lower = hex_to_bin_digit(hex_string[i+1]);
+		binary_string[bin_index++] = (upper << 4) | lower & 0xFF;
 	}
+
+    return binary_string;
 }
 
 
@@ -49,9 +63,9 @@ main(int argc, char * argv[])
 	char outputBuffer[32]; // to hold 16 bytes of output
 
 	strcpy(uri, "otpauth://totp/");
-	strcat(uri, accountName);
+	strcat(uri, urlEncode(accountName));
 	strcat(uri, "?issuer=");
-	strcat(uri, issuer);
+	strcat(uri, urlEncode(issuer));
 	strcat(uri, "&secret=");
 
 	assert (strlen(secret_hex) <= 20);
@@ -67,13 +81,10 @@ main(int argc, char * argv[])
 
 	//Dylan: a function exists to print a properly formatted barcode to the screen.
 
-	convertHexStringToCharArray(secret_hex, converted);
-	// for (int j = 0 ; j < strlen(secret_hex) / 2 ; j++) {		// debug
-	// 	printf("Char: %hhu\n", converted[j]);
-	// }
+	char* bin_secret = hex_to_binary(secret_hex);
 
-	base32_encode(converted, 10, outputBuffer, 32);
-	// printf("Encoded string: %s\n", outputBuffer);  // debug
+	base32_encode(bin_secret, 10, outputBuffer, 32);
+	
 	strcat(uri, outputBuffer);
 	strcat(uri, "&period=30");
 

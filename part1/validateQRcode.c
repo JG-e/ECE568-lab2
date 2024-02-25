@@ -2,93 +2,126 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-
+#include <math.h>
 #include "lib/sha1.h"
 #include "time.h"
 
 
-/**
-Converts the input hex string to an array of bytes as unsigned chars.  Every two hex
-digits of the string will be interpretted as an int and then put into the unsigned char 
-array.
-*/
-void convertHexStringToCharArray(char *hex, unsigned char *padded) {
-
-	// use strtol to convert the hex byte to a decimal
-	// loop over 4 bytes backwards, copying in 1 bit starting from 31 -> 24
-	
-	char * endPtr;
-	char buf[3]; // holds current two bytes of hex input as a small string
-
-	// Copy hex into two string parts
-	int i;
-	
-	for (i = 0 ; i < 10 ; i++) {
-		buf[0] = hex[2 * i];
-		buf[1] = hex[(2 * i) + 1];
-		buf[3] = '\0';
-
-		// convert hex string to long int
-		long int hexByte = strtol(buf, &endPtr, 16);
-
-		padded[i] = (unsigned char) hexByte;
-		// printf("padded[%d]: %hhu", i, padded[i]);
-	}
-	printf("\n");
-	for (i = 10 ; i < 64 ; i++) {
-		padded[i] = 0;
-	}
+// Function to convert a hexadecimal character to its binary equivalent
+uint8_t hex_to_bin_digit(char hex_digit) {
+    switch(hex_digit) {
+        case '0': return 0b0000;
+        case '1': return 0b0001;
+        case '2': return 0b0010;
+        case '3': return 0b0011;
+        case '4': return 0b0100;
+        case '5': return 0b0101;
+        case '6': return 0b0110;
+        case '7': return 0b0111;
+        case '8': return 0b1000;
+        case '9': return 0b1001;
+        case 'A': return 0b1010;
+        case 'B': return 0b1011;
+        case 'C': return 0b1100;
+        case 'D': return 0b1101;
+        case 'E': return 0b1110;
+        case 'F': return 0b1111;
+        default:
+            printf("Invalid hexadecimal digit: %c\n", hex_digit);
+    }
 }
 
-/**
-Converts the input integer to an array of bytes as unsigned chars.  Every byte of the
-integer will be interpretted as an individual unsigned char and then put into the unsigned char 
-array.
-*/
-void convertIntegerToCharArray(unsigned int steps, unsigned char *asChar) {
-	// Dont know if Little endian matters here ??  Try big endian first.
-
-	asChar[3] = steps & 0xFF;
-	asChar[2] = (steps >> 8) & 0xFF;
-	asChar[1] = (steps >> 16) & 0xFF;
-	asChar[0] = (steps >> 24) & 0xFF;
-	// ie: [most sig byte, 2nd, 3rd, least sig byte] of 'steps' int
-}
-
-
-void calculateKey(unsigned char *key_64, unsigned char *resultKey, int num) {
-	if (num == 0) {
-		// inner key, use 0x36
-		for (int i = 0 ; i < 64 ; i++) {
-				// printf("%hhu  ", key_64[i]);
-				resultKey[i] = key_64[i] ^ 0x36;
-				// printf("and I ran: ");
-				// printf("%hhu\n", resultKey[i]);
-				// printf("in func addr: %p\n", &resultKey[i]);
-		}
-	} else {
-		// outer pad, use 0x5c
-		for (int i = 0 ; i < 64 ; i++) {
-			// printf("me too: ");
-			resultKey[i] = key_64[i] ^ 0x5c;
-			// printf("%hhu\n", resultKey[i]);
-			// printf("in func addr: %p\n", &resultKey[i]);
-		}
+// Function to convert a hexadecimal string to binary
+char* hex_to_binary(const char* hex_string) {
+    // Allocate memory for binary string (4 bits for each hex digit)
+	// 8 bits = 1 byte, thus 2 hex digits = 1 byte, also +1 for null terminator
+  char* binary_string = (char*)malloc(SHA1_BLOCKSIZE); 
+	memset(binary_string, 0, SHA1_BLOCKSIZE);
+    
+	int bin_index = 0;
+	for (int i = 0; i < strlen(hex_string); i+=2) {
+		uint8_t upper = hex_to_bin_digit(hex_string[i]);
+		uint8_t lower = hex_to_bin_digit(hex_string[i+1]);
+		binary_string[bin_index++] = (upper << 4) | lower & 0xFF;
 	}
+
+  return binary_string;
 }
 
-static int
-validateTOTP(char * secret_hex, char * TOTP_string)
-{
-	// Step 1: Combine the key and innerpad to get the innerKey
-	unsigned char paddedKey[64];
-	// 1.1: prepare - pad the given secret_hex to 64 bytes.
-	convertHexStringToCharArray(secret_hex, paddedKey); // now padded key contains key and a bunch of 0s.
+int extractLast31Bits(int num) {
+    // Define a bitmask with the last 31 bits set to 1
+    int bitmask = 0x7FFFFFFF;
 
-	unsigned char innerKey[64];
-	// printf("%p\n", &innerKey);
-	// inner pad encapsulated
-	calculateKey(paddedKey, innerKey, 0); // padded key xor'ed with 0x36, put in innerKey
+    // Perform bitwise AND to extract the last 31 bits
+    int extractedBits = num & bitmask;
+
+    return extractedBits;
+}
+
+
+char* IntToBinaryString(int num) {
+    // Number of bits in an integer
+    int num_bits = sizeof(int) * 8;
+    char *binary_string = (char *)malloc(num_bits + 1); // +1 for null terminator
+    if (binary_string == NULL) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+
+    // Start from the leftmost bit (most significant bit)
+    for (int i = num_bits - 1; i >= 0; i--) {
+        // Extract the i-th bit using bitwise AND
+        int bit = (num >> i) & 1;
+        // Convert the bit to a character and store it in the string
+        binary_string[num_bits - 1 - i] = bit + '0';
+    }
+    // Null-terminate the string
+    binary_string[num_bits] = '\0';
+
+    return binary_string;
+}
+
+
+int DT(unsigned char* string) {
+	// 31-bit string
+	unsigned char res = (string[19] & 0x0f);
+	int offset = res;
+	int P = string[offset+3] | (string[offset+2] << 8) | (string[offset+1] << 16) | (string[offset] << 24);
+	// binCode below is 31 digits in binary
+	int binCode = extractLast31Bits(P);
+	return binCode;
+}
+
+int truncateHMAC(unsigned char* hmac) {
+	// truncate the hmac according to rfc4226
+
+	// Step 6.2  Generate a 4-byte string Snum = StToNum(Sbits) (Dynamic Truncation)
+	int Snum = DT(hmac);
+	// Step 6.3  Generate a 6-digit number Snum = Snum % 10^6
+	int totp = Snum % 1000000;
+	return totp;
+}
+
+void HMAC(unsigned char* key, unsigned char* result) {
+
+	int key_len = strlen(key);
+	unsigned char k_ipad[SHA1_BLOCKSIZE]; 	/* inner padding -
+								* key XORd with ipad
+								*/	
+	unsigned char k_opad[SHA1_BLOCKSIZE]; /* outer padding -
+								* key XORd with opad
+								*/
+	/* start out by storing key in pads */
+	bzero( k_ipad, sizeof k_ipad);
+	bzero( k_opad, sizeof k_opad);
+	bcopy( key, k_ipad, key_len);
+	bcopy( key, k_opad, key_len);
+
+	/* XOR key with ipad and opad values */
+	for (int i=0; i<SHA1_BLOCKSIZE; i++) {
+		k_ipad[i] ^= 0x36;
+		k_opad[i] ^= 0x5c;
+	}
 
 	// Step 2:  Calculate the 'message', aka the timestep from the unix time.
 	// Need to calculate timesteps as the message
@@ -97,74 +130,61 @@ validateTOTP(char * secret_hex, char * TOTP_string)
 	// Get the current time
 	time(&currentTime);
 	// assume the above is in seconds
-	unsigned int currStep = currentTime / 30;
-	// printf("Sizeof unsigned int: %d\n", sizeof(unsigned int));  // = 4
-	// Print the current Unix time - debug
-	// printf("Current Unix Time: %ld\n", currentTime); 
-	printf("Current timestep: %d\n", currentTime / 30); // debug
-	unsigned char stepsAsBytes[4];
-	convertIntegerToCharArray(currStep, stepsAsBytes);
-	for (int i = 0 ; i < 4 ; i++) {
-		printf("stepAsBytes[%d]: %hhu\n", i, stepsAsBytes[i]); // debug
-	}
+	long currStep = floor(currentTime / 30);
+
+	// Calculate time current Unix time
+	uint64_t time64 = (uint64_t)currStep;
+
+	uint8_t time8[] = {(time64 >> 56) & 0xff,
+						(time64 >> 48) & 0xff,
+						(time64 >> 40) & 0xff,
+						(time64 >> 32) & 0xff,
+						(time64 >> 24) & 0xff,
+						(time64 >> 16) & 0xff,
+						(time64 >> 8) & 0xff,
+						time64 & 0xff};
+
+	uint8_t* stepsAsBytes = (uint8_t*) time8;
 
 	// Now inner key and message have been calculated.  get the Inner hash:
 	// Step 3: get the inner hash.
   // calculate the innerHash = Sha1(inner key | message)
 
 	SHA1_INFO ctx1;
-	uint8_t innerHash[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
+
+	// Perform the hashing according to rfc2104
 	sha1_init(&ctx1);
-	sha1_update(&ctx1, innerKey, 64);
-	sha1_update(&ctx1, stepsAsBytes, 4); // message, as 4 bytes
-	// // keep calling sha1_update if you have more data to hash...
-	sha1_final(&ctx1, innerHash);
-	// printf("inner hash sha start (2/20): ");
-	// for (int i = 0; i < 2 ; i++) {
-	// 	printf("%hhu\n", innerHash[i]);
-	// }
-	// after final, sha array will be populated with the unsigned chars.  Pass this to outer hash.
+	sha1_update(&ctx1, k_ipad, SHA1_BLOCKSIZE);
+	sha1_update(&ctx1, stepsAsBytes, 8); // Time, as 8 bytes
+
+	// keep calling sha1_update if you have more data to hash...
+	sha1_final(&ctx1, result);
+	// after final, sha array will be populated with the unsigned chars.  
+	// Pass this to outer hash.
 
 	// Step 4: calculate the outer key
-	unsigned char outerKey[64];
-	calculateKey(paddedKey, outerKey, 1);
-		// printf("%p\n", &outerKey);
-	// for (int j = 0 ; j < 10 ; j++) {
-	// 	// sanity check:
-	// 	printf("Char:  %hhu\n", innerKey[j]);
-	// 	printf("out of func addr: %p\n", &innerKey[j]);
-	// }
+	// Step 5:  calculate the result = Sha1(outer key | inner hash)
 
-	// Step 5:  calculate the HMAC = Sha1(outer key | inner hash)
+	sha1_init(&ctx1);
+	sha1_update(&ctx1, k_opad, SHA1_BLOCKSIZE);
+	sha1_update(&ctx1, result, SHA1_DIGEST_LENGTH);
+	sha1_final(&ctx1, result);
+}
 
-	SHA1_INFO ctx2;
+
+static int
+validateTOTP(char * secret_hex, char * TOTP_string)
+{
+	// Step 1: Combine the key and innerpad to get the innerKey
+	unsigned char* key = (unsigned char*) hex_to_binary(secret_hex);
+	
 	uint8_t hmac[SHA1_DIGEST_LENGTH]; // SHA1_DIGEST_LENGTH aka 20
-	sha1_init(&ctx2);
-	sha1_update(&ctx2, outerKey, 64);
-	sha1_update(&ctx2, innerHash, 20);
-	sha1_final(&ctx2, hmac);
-	for (int i = 0 ; i < 20 ; i++) {
-		printf("hmac[%d]: %x\n", i, hmac[i]);
-		printf("hmac[%d]: %d\n", i, hmac[i]);
-	}
-
-
+	memset(hmac, 0, SHA1_DIGEST_LENGTH);
 	// Step 6: truncate the hmac to 6 digits.
 	// Step 6.1  Generate a 4-byte string Sbits = DT(HS) , return 31-bit string.
-	printf("hmac[19]: %x\n", hmac[19]);
-	printf("hmac[19] & 0xf: %x\n", hmac[19] & 0xf);
-	int offset = hmac[19] & 0xf;
-	// binCode below is 31 digits in binary
-	int binCode = (hmac[offset]  & 0x7f) << 24  // the 0x7f handles the fact that final bit might cause sign issues
-			| (hmac[offset+1] & 0xff) << 16
-			| (hmac[offset+2] & 0xff) <<  8
-			| (hmac[offset+3] & 0xff);
-
-	// Step 6.2, modulo the binCode to be 6 digits:
-	int totp = binCode % 1000000; // 10^6
-	printf("Derived totp: %d\n", totp);
+	HMAC(key, hmac);
+	int totp = truncateHMAC(hmac);
 	int givenTotp = atoi(TOTP_string);
-	printf("Given totp: %d\n", givenTotp);
 
 	// Step 7: return whether the given string is equal to the truncated hmac as integer values
 	return totp == givenTotp;
