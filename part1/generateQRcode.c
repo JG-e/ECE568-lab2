@@ -68,12 +68,9 @@ main(int argc, char * argv[])
 	//Dylan: a function exists to print a properly formatted barcode to the screen.
 
 	convertHexStringToCharArray(secret_hex, converted);
-	// for (int j = 0 ; j < strlen(secret_hex) / 2 ; j++) {		// debug
-	// 	printf("Char: %hhu\n", converted[j]);
-	// }
 
 	base32_encode(converted, 10, outputBuffer, 32);
-	// printf("Encoded string: %s\n", outputBuffer);  // debug
+	
 	strcat(uri, outputBuffer);
 	strcat(uri, "&period=30");
 
